@@ -1,0 +1,122 @@
+<!--
+  DIGIKON "Talk to us" form - connected to the CRM.
+  1) Change CRM_URL below to your CRM address (same as APP_URL in the CRM .env).
+  2) Add your landing-page domain in CRM -> Lead Sources -> Allowed website origins.
+  If you already have this form, you only need: the name="" attributes, the hidden hp_field input,
+  and the <script> block at the bottom.
+-->
+<div class="dk-wrap">
+  <form id="digikon-lead-form" class="dk-card" novalidate>
+    <h2>Talk to DIGIKON Solutions</h2>
+    <p class="dk-sub">Share a few details and we can take it from there.</p>
+
+    <label for="dk-name">Your name</label>
+    <input id="dk-name" name="name" type="text" placeholder="e.g. Alex Morgan" required maxlength="120" autocomplete="name">
+
+    <label for="dk-email">Work email</label>
+    <input id="dk-email" name="work_email" type="email" placeholder="you@company.com" required maxlength="190" autocomplete="email">
+
+    <!-- Recommended: with a WhatsApp number the CRM can also send WhatsApp follow-ups and AI can read the chat.
+    <label for="dk-phone">WhatsApp number (optional)</label>
+    <input id="dk-phone" name="whatsapp" type="tel" placeholder="0300 1234567" maxlength="30" autocomplete="tel">
+    -->
+
+    <label for="dk-business">Business / website (optional)</label>
+    <input id="dk-business" name="business" type="text" placeholder="Your company name or website" maxlength="190" autocomplete="organization">
+
+    <label for="dk-automate">What would you like to automate?</label>
+    <select id="dk-automate" name="automate" required>
+      <option value="" disabled selected>Select a priority</option>
+      <option>Lead capture &amp; follow-ups</option>
+      <option>WhatsApp replies &amp; chat</option>
+      <option>Proposals &amp; invoices</option>
+      <option>Sales reporting &amp; CRM</option>
+      <option>Something else</option>
+    </select>
+
+    <!-- spam trap: keep hidden and empty -->
+    <input type="text" name="hp_field" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
+
+    <button type="submit" id="dk-submit">Request a conversation <span aria-hidden="true">&rarr;</span></button>
+    <p class="dk-note" id="dk-note" role="status" aria-live="polite">We usually reply within one business day.</p>
+  </form>
+</div>
+
+<style>
+  .dk-wrap { display:flex; justify-content:center; padding:24px 12px; background:#06191d; font-family: "Manrope", "Segoe UI", Arial, sans-serif; }
+  .dk-card { width:100%; max-width:420px; background:#0f2a2e; border:1px solid rgba(129,216,112,.35); border-radius:28px; padding:30px 24px; color:#fff;
+             box-shadow:0 0 0 1px rgba(129,216,112,.15), 0 0 28px rgba(129,216,112,.18); box-sizing:border-box; }
+  .dk-card h2 { margin:0 0 6px; text-align:center; font-size:20px; }
+  .dk-sub { margin:0 0 22px; text-align:center; color:#b9c9c6; font-size:13px; }
+  .dk-card label { display:block; font-size:12.5px; font-weight:700; margin:14px 0 8px; }
+  .dk-card input, .dk-card select { width:100%; box-sizing:border-box; background:#21403f; border:1px solid transparent; border-radius:10px; padding:13px 14px;
+             color:#fff; font:inherit; font-size:14px; outline:none; }
+  .dk-card input::placeholder { color:#8fa5a2; }
+  .dk-card input:focus, .dk-card select:focus { border-color:#81D870; box-shadow:0 0 0 3px rgba(129,216,112,.25); }
+  .dk-card .dk-invalid { border-color:#ff8a7a; }
+  #dk-submit { width:100%; margin-top:18px; padding:13px; border:0; border-radius:20px; background:#81D870; color:#03171D; font:inherit; font-weight:800; font-size:14px; cursor:pointer; }
+  #dk-submit:disabled { opacity:.6; cursor:wait; }
+  .dk-note { margin:12px 0 0; text-align:center; color:#b9c9c6; font-size:12px; line-height:1.5; }
+  .dk-note.ok { color:#81D870; font-weight:700; }
+  .dk-note.err { color:#ff8a7a; }
+</style>
+
+<script>
+(function () {
+  // === CHANGE THIS - your CRM address (no trailing slash) ===
+  var CRM_URL = 'https://crm.yourdomain.com';
+  // Optional: send the visitor to a thank-you page after success (leave '' to stay on the page)
+  var THANK_YOU_URL = '';
+  // Optional: only if you switched on "Form key" in CRM -> Lead Sources
+  var FORM_KEY = '';
+
+  var form = document.getElementById('digikon-lead-form');
+  if (!form) return;
+  var btn = form.querySelector('button[type="submit"]');
+  var note = document.getElementById('dk-note');
+  var submissionId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+
+  function show(msg, cls) { note.textContent = msg; note.className = 'dk-note ' + (cls || ''); }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    form.querySelectorAll('.dk-invalid').forEach(function (el) { el.classList.remove('dk-invalid'); });
+    if (!form.checkValidity()) {
+      form.querySelectorAll(':invalid').forEach(function (el) { el.classList.add('dk-invalid'); });
+      show('Please fill in your name, work email and what you would like to automate.', 'err');
+      return;
+    }
+
+    var data = {};
+    new FormData(form).forEach(function (v, k) { data[k] = v; });
+    var q = new URLSearchParams(location.search);
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'].forEach(function (k) { if (q.get(k)) data[k] = q.get(k); });
+    data.landing_page_url = location.href.split('#')[0];
+    data.referrer = document.referrer || '';
+    data.submission_id = submissionId; // same id on double-click -> no duplicate lead
+
+    var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (FORM_KEY) headers['X-Form-Key'] = FORM_KEY;
+
+    btn.disabled = true;
+    show('Sending...');
+    fetch(CRM_URL + '/api/v1/public/leads', { method: 'POST', headers: headers, body: JSON.stringify(data) })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+      .then(function (res) {
+        if (res.body && res.body.ok) {
+          if (THANK_YOU_URL) { location.href = THANK_YOU_URL; return; }
+          form.reset();
+          show(res.body.message || 'Thank you! We will contact you shortly.', 'ok');
+          return;
+        }
+        var first = res.body && res.body.errors ? Object.values(res.body.errors)[0][0] : null;
+        show(first || (res.body && res.body.message) || 'Something went wrong. Please try again.', 'err');
+        btn.disabled = false;
+      })
+      .catch(function () {
+        show('Could not send right now. Please check your internet and try again.', 'err');
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
